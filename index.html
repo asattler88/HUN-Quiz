@@ -190,18 +190,67 @@ justify-content: center;  }
     <label><input type="radio" name="q2" value="c" />Buda, Esztergom, Pécs, Sopron, Százhalombatta</label>
   </div>
 
-  <!-- Short Answer -->
-  <div class="question" data-type="shortanswer" data-answer="Isten, áldd meg a magyart
-Jó kedvvel, bőséggel,
-Nyújts feléje védő kart,
-Ha küzd ellenséggel;
-Bal sors akit régen tép,
-Hozz rá víg esztendőt,
-Megbűnhődte már e nép
-A múltat s jövendőt!">
-    <p>3. Írd le a magyar himnusz első négy versszakát!</p>
-    <input type="text" id="q3" />
-  </div>
+ // Short Answer with normalization and fuzzy matching
+function normalizeText(text) {
+  return text
+    .toLowerCase()
+    .replace(/[.,!?;:\\-]/g, '') // remove punctuation
+    .replace(/\s+/g, ' ')        // normalize whitespace
+    .trim();
+}
+
+function levenshtein(a, b) {
+  const matrix = Array.from({ length: b.length + 1 }, () => []);
+  for (let i = 0; i <= b.length; i++) matrix[i][0] = i;
+  for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+
+  for (let i = 1; i <= b.length; i++) {
+    for (let j = 1; j <= a.length; j++) {
+      if (b[i - 1] === a[j - 1]) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,   // deletion
+          matrix[i][j - 1] + 1,   // insertion
+          matrix[i - 1][j - 1] + 1 // substitution
+        );
+      }
+    }
+  }
+
+  return matrix[b.length][a.length];
+}
+
+function isShortAnswerFuzzyCorrect(userInput, correctAnswer, tolerance = 10) {
+  const normalizedUser = normalizeText(userInput);
+  const normalizedCorrect = normalizeText(correctAnswer);
+  const distance = levenshtein(normalizedUser, normalizedCorrect);
+  return distance <= tolerance;
+}
+
+document.querySelectorAll(".question[data-type='shortanswer']").forEach((q) => {
+  const correct = q.dataset.answer;
+  const input = q.querySelector("input[type='text']");
+  input.classList.remove("correct", "incorrect");
+
+  // Remove previous correct-answer element if exists
+  const oldCA = q.querySelector(".correct-answer");
+  if (oldCA) oldCA.remove();
+
+  if (!input.value.trim()) return;
+
+  const userInput = input.value;
+  const isCorrect = isShortAnswerFuzzyCorrect(userInput, correct, 10); // tolerance = 10
+
+  input.classList.add(isCorrect ? "correct" : "incorrect");
+
+  if (!isCorrect) {
+    let ca = document.createElement("div");
+    ca.className = "correct-answer";
+    ca.textContent = `Correct answer: ${correct}`;
+    q.appendChild(ca);
+  }
+});
 
   <!-- Matching (Drag & Drop) -->
   <div class="question" data-type="dragdrop">
